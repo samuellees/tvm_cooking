@@ -5,7 +5,7 @@ import numpy
 import logging
 import sys
 
-@autotvm.template("examples/gemm_tune")
+@autotvm.template("examples/tune_gemm_cuda")
 def gemm_tune(M, N, K, dtype):
 
   # create tensor
@@ -18,6 +18,17 @@ def gemm_tune(M, N, K, dtype):
   s = te.create_schedule(C.op)
   y, x = s[C].op.axis
 
+  # define search space
+  cfg = autotvm.get_config()
+  cfg.define_knob("block_size", [32, 64, 128, 256])
+  cfg.define_knob("nty", [2, 4, 8, 16, 32])
+  cfg.define_knob("ntx", [2, 4, 8, 16, 32])
+  block_size = cfg["block_size"].val
+  nty = cfg["nty"].val
+  ntx = cfg['ntx'].val
+  wpty = block_size // nty
+  wptx = block_size // ntx
+
   # set memory hierarchy
   sharedA = s.cache_read(A, 'shared', [C])
   sharedB = s.cache_read(B, 'shared', [C])
@@ -25,22 +36,20 @@ def gemm_tune(M, N, K, dtype):
   regB = s.cache_read(sharedB, 'local', [C])
   regC = s.cache_write(C, 'local')
 
-  # define search space
-  cfg = autotvm.get_config()
-  cfg.define_split("tile_y", y, num_outputs=3)
-  cfg.define_split("tile_x", x, num_outputs=3)
-  by, yo, yi = cfg["tile_y"].apply(s, C, y)
-  bx, xo, xi = cfg["tile_x"].apply(s, C, x)
-
   # get thread and block idx
   block_y = te.thread_axis('blockIdx.y')
   block_x = te.thread_axis('blockIdx.x')
-  thread_yi = te.thread_axis('threadIdx.y')
-  thread_xi = te.thread_axis('threadIdx.x')
-  thread_yo = te.thread_axis("vthread", name="vy")
-  thread_xo = te.thread_axis("vthread", name="vx")
+  thread_yi = te.thread_axis((0, nty), 'threadIdx.y')
+  thread_xi = te.thread_axis((0, ntx), 'threadIdx.x')
+  thread_yo = te.thread_axis((0, wpty), "vthread", name="vy")
+  thread_xo = te.thread_axis((0, wptx), "vthread", name="vx")
 
   # describe how to split workloads(C matrix)
+  y, x = s[C].op.axis
+  by, y_ = s[C].split(y, factor=block_size)
+  bx, x_ = s[C].split(x, factor=block_size)
+  yo, yi = s[C].split(y_, nparts=wpty) # virtual split
+  xo, xi = s[C].split(x_, nparts=wptx) # virtual split
   s[C].bind(by, block_y)
   s[C].bind(bx, block_x)
   s[C].bind(yo, thread_yo)
@@ -52,8 +61,7 @@ def gemm_tune(M, N, K, dtype):
   # describe how to load regC
   s[regC].compute_at(s[C], xo)
   k, = s[regC].op.reduce_axis
-  cfg.define_split("split_k", k, num_outputs=2)
-  ko, ki = cfg["tile_y"].apply(s, regC, k)
+  ko, ki = s[regC].split(k, factor=block_size)
   s[regC].reorder(ko, ki)
   s[regC].unroll(ki)
 
@@ -61,10 +69,10 @@ def gemm_tune(M, N, K, dtype):
   s[sharedA].compute_at(s[regC], ko)
   s[regA].compute_at(s[regC], ki)
   yA, xA = s[sharedA].op.axis
-  cfg.define_split("split_yA", yA, num_outputs=3)
-  cfg.define_split("split_xA", xA, num_outputs=3)
-  byA, yoA, yiA = cfg["split_yA"].apply(s, sharedA, yA)
-  bxA, xoA, xiA = cfg["split_xA"].apply(s, sharedA, xA)
+  byA, yA_ = s[sharedA].split(yA, factor=block_size)
+  bxA, xA_ = s[sharedA].split(xA, factor=block_size)
+  yoA, yiA = s[sharedA].split(yA_, nparts=wpty) # virtual split
+  xoA, xiA = s[sharedA].split(xA_, nparts=wptx) # virtual split
   s[sharedA].bind(yiA, thread_yi)
   s[sharedA].bind(xiA, thread_xi)
   s[sharedA].reorder(byA, bxA, yiA, xiA, yoA, xoA)
@@ -76,10 +84,10 @@ def gemm_tune(M, N, K, dtype):
   s[sharedB].compute_at(s[regC], ko)
   s[regB].compute_at(s[regC], ki)
   yB, xB = s[sharedB].op.axis
-  cfg.define_split("split_yB", yB, num_outputs=3)
-  cfg.define_split("split_xB", xB, num_outputs=3)
-  byB, yoB, yiB = cfg["split_yB"].apply(s, sharedB, yB)
-  bxB, xoB, xiB = cfg["split_xB"].apply(s, sharedB, xB)
+  byB, yB_ = s[sharedB].split(yB, factor=block_size)
+  bxB, xB_ = s[sharedB].split(xB, factor=block_size)
+  yoB, yiB = s[sharedB].split(yB_, nparts=wpty) # virtual split
+  xoB, xiB = s[sharedB].split(xB_, nparts=wptx) # virtual split
   s[sharedB].bind(yiB, thread_yi)
   s[sharedB].bind(xiB, thread_xi)
   s[sharedB].reorder(byB, bxB, yiB, xiB, yoB, xoB)
@@ -95,11 +103,12 @@ def gemm_tune(M, N, K, dtype):
 dtype = "float32"
 target = 'cuda'
 
-matrix_size = 1024
-n_trail = 10
+matrix_size = 8096
+n_trail = 100
 M = matrix_size
 N = matrix_size
 K = matrix_size
+log_file = './log/tune_gemm_cuda.log'
 
 # answer from numpy
 ctx = tvm.context(target, 0)
@@ -108,7 +117,7 @@ b = tvm.nd.array(numpy.random.rand(K, N).astype(dtype), ctx)
 answer = numpy.dot(a.asnumpy(), b.asnumpy())
 
 # get auto tvm config space
-task = autotvm.task.create("examples/gemm_tune", args=(M, N, K, dtype), target=target)
+task = autotvm.task.create("examples/tune_gemm_cuda", args=(M, N, K, dtype), target=target)
 print(task.config_space)
 # logging
 logging.getLogger('autotvm').setLevel(logging.DEBUG)
@@ -119,9 +128,9 @@ measure_option = autotvm.measure_option(builder='local', runner=autotvm.LocalRun
 tuner = autotvm.tuner.RandomTuner(task)
 tuner.tune(n_trial=n_trail,
            measure_option=measure_option,
-           callbacks=[autotvm.callback.log_to_file("gemm.log")])
+           callbacks=[autotvm.callback.log_to_file(log_file)])
 # apply best from log file
-with autotvm.apply_history_best("gemm.log"):
+with autotvm.apply_history_best(log_file):
   with tvm.target.create(target):
     s, arg_bufs = gemm_tune(M, N, K, dtype)
     func = tvm.build(s, arg_bufs)
@@ -131,15 +140,7 @@ func(a, b, c_tvm)
 tvm.testing.assert_allclose(answer, c_tvm.asnumpy(), rtol=1e-2)
 print("tune success!")
 
-
-# time = evaluator(a, b, c).mean
-# flops = 2.0*M/1000*N/1000*K/1000/time
-
-# print('tvm: %f' % time)
-# print("flops: %f" % flops)
-
-# flops of manual optimize: 6.378 T
-# flops of tvm optimize: 6.592 T
+# flops of autotvm: 6.533 T
 
 # print(tvm.lower(s, [A, B, C], simple_mode=True))
 

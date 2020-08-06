@@ -110,7 +110,7 @@ flops = 2.0*M/1000*N/1000*K/1000/time
 print('tvm: %f' % time)
 print("flops: %f" % flops)
 
-# flops of manual optimize: 6.378 T
+# flops of CUDA optimize: 6.378 T
 # flops of tvm optimize: 6.592 T
 
 

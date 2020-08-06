@@ -39,6 +39,8 @@ n_trail = 10
 M = matrix_size
 N = matrix_size
 K = matrix_size
+log_file = './log/tune_gemm_cpu.log'
+
 # get auto tvm config space
 task = autotvm.task.create("examples/gemm_v1", args=(M, N, K, 'float32'), target='llvm')
 print(task.config_space)
@@ -51,9 +53,9 @@ measure_option = autotvm.measure_option(builder='local', runner=autotvm.LocalRun
 tuner = autotvm.tuner.RandomTuner(task)
 tuner.tune(n_trial=n_trail,
            measure_option=measure_option,
-           callbacks=[autotvm.callback.log_to_file("gemm.log")])
+           callbacks=[autotvm.callback.log_to_file(log_file)])
 # apply best from log file
-with autotvm.apply_history_best("gemm.log"):
+with autotvm.apply_history_best(log_file):
   with tvm.target.create("llvm"):
     s, arg_bufs = gemm_v1(M, N, K, 'float32')
     func = tvm.build(s, arg_bufs)

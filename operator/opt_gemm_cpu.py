@@ -28,8 +28,6 @@ np_runing_time = timeit.timeit(setup='import numpy\n'
 print("Numpy running time: %f" % (np_runing_time / np_repeat))
 answer = numpy.dot(a.asnumpy(), b.asnumpy())
 
-
-
 A = te.placeholder((M, K), dtype='float32', name='A')
 B = te.placeholder((K, N), dtype='float32', name='B')
 k = te.reduce_axis((0, K), name='k')
