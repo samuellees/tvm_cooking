@@ -43,6 +43,7 @@ stride_list = [1, 2, 1, 2, 1, 2, 1, 2, 1]
 target = tvm.target.Target("cuda")
 
 for i in range(len(co_list)):
+    i = 6
     num_test_trails = 100
     nchw = nchw_list[i]
     stride = stride_list[i]
@@ -114,3 +115,4 @@ for i in range(len(co_list)):
     print("%d\'th layer: tvm time: %.3f"
             % (i, (end - start - (end2 - end)) * 1000 / num_test_trails))
     print("")
+    exit()

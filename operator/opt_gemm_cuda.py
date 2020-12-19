@@ -1,6 +1,6 @@
 import tvm
 from tvm import te
-import numpy
+import numpy as np
 
 dtype = "float32"
 target = 'cuda'
@@ -94,20 +94,20 @@ s[sharedB].unroll(yoB)
 
 # answer from numpy
 ctx = tvm.context(target, 0)
-a = tvm.nd.array(numpy.random.rand(M, K).astype(dtype), ctx)
-b = tvm.nd.array(numpy.random.rand(K, N).astype(dtype), ctx)
-answer = numpy.dot(a.asnumpy(), b.asnumpy())
+a = tvm.nd.array(np.random.rand(M, K).astype(dtype), ctx)
+b = tvm.nd.array(np.random.rand(K, N).astype(dtype), ctx)
+answer = np.dot(a.asnumpy(), b.asnumpy())
 
 # answer from tvm
 func = tvm.build(s, [A, B, C], target=target, name='gemm')
-c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 func(a, b, c)
-tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 evaluator(a, b, c)
 time = evaluator(a, b, c).mean
 flops = 2.0*M/1000*N/1000*K/1000/time
-print('tvm: %f' % time)
+print('tvm time: %f s' % time)
 print("flops: %f" % flops)
 
 # flops of CUDA optimize: 6.378 T

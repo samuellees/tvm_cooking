@@ -1,5 +1,5 @@
 import tvm
-import numpy
+import numpy as np
 from tvm import te
 import timeit
 
@@ -13,8 +13,8 @@ dtype = "float32"
 target = 'llvm'
 
 ctx = tvm.context(target, 0)
-a = tvm.nd.array(numpy.random.rand(M, K).astype(dtype), ctx)
-b = tvm.nd.array(numpy.random.rand(K, N).astype(dtype), ctx)
+a = tvm.nd.array(np.random.rand(M, K).astype(dtype), ctx)
+b = tvm.nd.array(np.random.rand(K, N).astype(dtype), ctx)
 np_repeat = 100
 np_runing_time = timeit.timeit(setup='import numpy\n'
                                      'M = ' + str(M) + '\n'
@@ -26,7 +26,7 @@ np_runing_time = timeit.timeit(setup='import numpy\n'
                                stmt='answer = numpy.dot(a, b)',
                                number=np_repeat)
 print("Numpy running time: %f" % (np_runing_time / np_repeat))
-answer = numpy.dot(a.asnumpy(), b.asnumpy())
+answer = np.dot(a.asnumpy(), b.asnumpy())
 
 A = te.placeholder((M, K), dtype='float32', name='A')
 B = te.placeholder((K, N), dtype='float32', name='B')
@@ -38,7 +38,7 @@ C = te.compute((M, N), lambda i, j: te.sum(A[i, k]*B[k,j], axis=k), name='C')
 # func = tvm.build(s, [A, B, C], target=target, name='mmult')
 # c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
 # func(a, b, c)
-# tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+# np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 # evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 # print('Baseline: %f' % evaluator(a, b, c).mean)
 
@@ -48,9 +48,9 @@ C = te.compute((M, N), lambda i, j: te.sum(A[i, k]*B[k,j], axis=k), name='C')
 # y, x = s[C].op.axis
 # s[C].reorder(y, k, x)
 # func = tvm.build(s, [A, B, C], target=target, name='mmult')
-# c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+# c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 # func(a, b, c)
-# tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+# np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 # evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 # print('reorder: %f' % evaluator(a, b, c).mean)
 
@@ -63,9 +63,9 @@ C = te.compute((M, N), lambda i, j: te.sum(A[i, k]*B[k,j], axis=k), name='C')
 # xo, xi = s[C].split(x, factor=block_size)
 # s[C].reorder(yo, xo, ko, ki, yi, xi)
 # func = tvm.build(s, [A, B, C], target=target, name='mmult')
-# c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+# c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 # func(a, b, c)
-# tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+# np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 # evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 # print('tiling1: %f' % evaluator(a, b, c).mean)
 
@@ -78,9 +78,9 @@ C = te.compute((M, N), lambda i, j: te.sum(A[i, k]*B[k,j], axis=k), name='C')
 # xo, xi = s[C].split(x, factor=block_size)
 # s[C].reorder(yo, xo, ko, yi, ki, xi)
 # func = tvm.build(s, [A, B, C], target=target, name='mmult')
-# c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+# c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 # func(a, b, c)
-# tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+# np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 # evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 # print('tiling2: %f' % evaluator(a, b, c).mean)
 
@@ -94,9 +94,9 @@ xo, xi = s[C].split(x, factor=block_size)
 s[C].reorder(yo, xo, ko, yi, ki, xi)
 s[C].vectorize(xi)
 func = tvm.build(s, [A, B, C], target=target, name='mmult')
-c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 func(a, b, c)
-tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 print('tiling2+vec: %f' % evaluator(a, b, c).mean)
 
@@ -112,9 +112,9 @@ s[C].vectorize(xi)
 s[C].unroll(ki)
 s[C].parallel(xo)
 func = tvm.build(s, [A, B, C], target=target, name='mmult')
-c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 func(a, b, c)
-tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 print('tiling2+vec+parallel+unroll: %f' % evaluator(a, b, c).mean)
 
@@ -138,9 +138,9 @@ s[CC].unroll(ki)
 
 s[C].parallel(xo)
 func = tvm.build(s, [A, B, C], target=target, name='mmult')
-c = tvm.nd.array(numpy.zeros((M, N), dtype=dtype), ctx)
+c = tvm.nd.array(np.zeros((M, N), dtype=dtype), ctx)
 func(a, b, c)
-tvm.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
+np.testing.assert_allclose(c.asnumpy(), answer, rtol=1e-5)
 evaluator = func.time_evaluator(func.entry_name, ctx, number=np_repeat)
 print('tiling2+vec+parallel+unroll+cache_write: %f' % evaluator(a, b, c).mean)
 

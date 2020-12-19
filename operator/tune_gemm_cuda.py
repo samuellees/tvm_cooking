@@ -1,7 +1,7 @@
 import tvm
 from tvm import te
 from tvm import autotvm
-import numpy
+import numpy as np
 import logging
 import sys
 
@@ -112,9 +112,9 @@ log_file = './log/tune_gemm_cuda.log'
 
 # answer from numpy
 ctx = tvm.context(target, 0)
-a = tvm.nd.array(numpy.random.rand(M, K).astype(dtype), ctx)
-b = tvm.nd.array(numpy.random.rand(K, N).astype(dtype), ctx)
-answer = numpy.dot(a.asnumpy(), b.asnumpy())
+a = tvm.nd.array(np.random.rand(M, K).astype(dtype), ctx)
+b = tvm.nd.array(np.random.rand(K, N).astype(dtype), ctx)
+answer = np.dot(a.asnumpy(), b.asnumpy())
 
 # get auto tvm config space
 task = autotvm.task.create("examples/tune_gemm_cuda", args=(M, N, K, dtype), target=target)
@@ -135,9 +135,9 @@ with autotvm.apply_history_best(log_file):
     s, arg_bufs = gemm_tune(M, N, K, dtype)
     func = tvm.build(s, arg_bufs)
 # check correntness
-c_tvm = tvm.nd.array(numpy.random.rand(M, N).astype(dtype), ctx)
+c_tvm = tvm.nd.array(np.random.rand(M, N).astype(dtype), ctx)
 func(a, b, c_tvm)
-tvm.testing.assert_allclose(answer, c_tvm.asnumpy(), rtol=1e-2)
+np.testing.assert_allclose(answer, c_tvm.asnumpy(), rtol=1e-2)
 print("tune success!")
 
 # flops of autotvm: 6.533 T

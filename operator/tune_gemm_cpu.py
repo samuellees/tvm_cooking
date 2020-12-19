@@ -65,7 +65,7 @@ b_np = np.random.uniform(size=(K, N)).astype(np.float32)
 c_np = a_np.dot(b_np)
 c_tvm = tvm.nd.empty(c_np.shape)
 func(tvm.nd.array(a_np), tvm.nd.array(b_np), c_tvm)
-tvm.testing.assert_allclose(c_np, c_tvm.asnumpy(), rtol=1e-2)
+np.testing.assert_allclose(c_np, c_tvm.asnumpy(), rtol=1e-2)
 print("tune success!")
 
 

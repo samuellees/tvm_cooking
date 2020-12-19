@@ -9,23 +9,23 @@ import torch
 
 nchw_co_ksize_stride_pad_list = [
     [32, 3, 224, 224, 32, 3, 1, 1],
-    # [32, 32, 224, 224, 64, 3, 2, 1],
-    # [32, 64, 112, 112, 64, 3, 1, 1],
+    [32, 32, 224, 224, 64, 3, 2, 1],
+    [32, 64, 112, 112, 64, 3, 1, 1],
 
-    # [32, 64, 112, 112, 128, 3, 2, 1],
-    # [32, 128, 56, 56, 128, 3, 1, 1],
-    # [32, 64, 112, 112, 128, 1, 2, 0],
-    # [32, 128, 56, 56, 256, 3, 2, 1],
-    # [32, 256, 28, 28, 256, 3, 1, 1],
-    # [32, 128, 56, 56, 256, 1, 2, 0],
-    # [32, 256, 28, 28, 512, 3, 2, 1],
-    # [32, 512, 14, 14, 512, 3, 1, 1],
-    # [32, 256, 28, 28, 512, 1, 2, 0],
-    # [32, 512, 14, 14, 1024, 3, 2, 1]
+    [32, 64, 112, 112, 128, 3, 2, 1],
+    [32, 128, 56, 56, 128, 3, 1, 1],
+    [32, 64, 112, 112, 128, 1, 2, 0],
+    [32, 128, 56, 56, 256, 3, 2, 1],
+    [32, 256, 28, 28, 256, 3, 1, 1],
+    [32, 128, 56, 56, 256, 1, 2, 0],
+    [32, 256, 28, 28, 512, 3, 2, 1],
+    [32, 512, 14, 14, 512, 3, 1, 1],
+    [32, 256, 28, 28, 512, 1, 2, 0],
+    [32, 512, 14, 14, 1024, 3, 2, 1]
 ]
 device = "cuda"
 target = tvm.target.Target(device)
-num_test_trails = 1
+num_test_trails = 100
 
 for i in range(len(nchw_co_ksize_stride_pad_list)):
     time_begin = time.time()
@@ -65,7 +65,7 @@ for i in range(len(nchw_co_ksize_stride_pad_list)):
     # # Check results
     # np.testing.assert_allclose(data_np, data_tvm.asnumpy(), rtol=1e-3)
     # np.testing.assert_allclose(kernel_np, kernel_tvm.asnumpy(), rtol=1e-3)
-    np.testing.assert_allclose(out_np, out_tvm.asnumpy(), rtol=1e-3)
+    # np.testing.assert_allclose(out_np, out_tvm.asnumpy(), rtol=1e-3)
 
     # torch timing
     torch.cuda.synchronize()
@@ -85,9 +85,11 @@ for i in range(len(nchw_co_ksize_stride_pad_list)):
     start = time.time()
     for _ in range(num_test_trails):
         func(data_tvm, kernel_tvm, out_tvm)
-    _ = out_tvm.asnumpy()
+        
+    out_tvm.ctx.sync()
+    # _ = out_tvm.asnumpy()
     end = time.time()
-    _ = out_tvm.asnumpy()
+    # _ = out_tvm.asnumpy()
     end2 = time.time()
     print("%d\'th layer: tvm time: %.3f"
             % (i, (end - start - (end2 - end)) * 1000 / num_test_trails))
