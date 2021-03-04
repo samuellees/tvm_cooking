@@ -77,14 +77,14 @@ saved_rvars_tvm = tvm.nd.empty(running_mean_torch.shape, ctx=ctx)
 running_mean_tvm2 = tvm.nd.empty(running_mean_np.shape, ctx=ctx)
 running_var_tvm2 = tvm.nd.empty(running_var_np.shape, ctx=ctx)
 func(data_tvm, scale_tvm, bias_tvm, running_mean_tvm, running_var_tvm, 
-    momentum_tvm, eps_tvm, out_tvm, saved_mean_tvm, saved_rvars_tvm, running_mean_tvm2, running_var_tvm2)
+    momentum_tvm, eps_tvm, out_tvm, saved_mean_tvm, saved_rvars_tvm, running_mean_tvm, running_var_tvm)
 # Check results
 np.testing.assert_allclose(data_np, data_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
 np.testing.assert_allclose(scale_np, scale_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
 np.testing.assert_allclose(bias_np, bias_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
 np.testing.assert_allclose(out_np, out_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
-np.testing.assert_allclose(running_mean_np, running_mean_tvm2.asnumpy(), rtol=1e-3, atol=1e-3)
-np.testing.assert_allclose(running_var_np, running_var_tvm2.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(running_mean_np, running_mean_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(running_var_np, running_var_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
 np.testing.assert_allclose(data_np.mean((0, 2, 3)), saved_mean_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
 np.testing.assert_allclose(np.sqrt(data_np.var((0, 2, 3)) + eps_np), saved_rvars_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
 
