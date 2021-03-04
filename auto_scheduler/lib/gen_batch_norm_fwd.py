@@ -26,37 +26,39 @@ def batch_norm_fwd(N, C, H, W, dtype="float32"):
   frac_num_ele = 1.0 / num_ele
   # compute batch mean
   mean_sum = topi.sum(data, axis, keepdims=True)
-  mean = topi.multiply(mean_sum, frac_num_ele)
-  # compute batch var
-  var_sub = topi.subtract(data, mean)
+  saved_mean = topi.multiply(mean_sum, frac_num_ele)
+  # compute batch rvars
+  var_sub = topi.subtract(data, saved_mean)
   var_mul = topi.multiply(var_sub, var_sub)
   var_sum = topi.sum(var_mul, axis, keepdims=True)
   var = topi.multiply(var_sum, frac_num_ele)
-  # compute output
   output_add = topi.add(var, eps)
-  output_sqrt = topi.sqrt(output_add)
-  output_sub = topi.subtract(data, mean)
-  output_norm = topi.divide(output_sub, output_sqrt)
+  saved_rvars = topi.sqrt(output_add)
+  # # compute output
+  output_sub = topi.subtract(data, saved_mean)
+  output_norm = topi.divide(output_sub, saved_rvars)
   scale_board = topi.reshape(scale, bshape)
   bias_board = topi.reshape(bias, bshape)
   output = topi.add(topi.multiply(output_norm, scale_board), bias_board)
-  # compute saved_mean
-
-  saved_mean_mul1 = topi.multiply(running_mean, topi.subtract(1, momentum))
-  saved_mean_mul2 = topi.multiply(mean, momentum)
-  saved_mean = topi.add(saved_mean_mul1, saved_mean_mul2)
+  # reshape saved_rvars
+  saved_rvars = topi.reshape(saved_rvars, oshape)
+  # update running mean
+  running_mean_mul1 = topi.multiply(running_mean, topi.subtract(1.0, momentum))
+  running_mean_mul2 = topi.multiply(topi.reshape(saved_mean, oshape), momentum)
+  running_mean_out = topi.add(running_mean_mul1, running_mean_mul2)
+  # update running var
+  saved_var_mul1 = topi.multiply(running_var, topi.subtract(1.0, momentum))
+  saved_var_mul2 = topi.multiply(topi.reshape(var, oshape), momentum)
+  running_var_out = topi.add(saved_var_mul1, saved_var_mul2)
+  # reshape saved_mean
   saved_mean = topi.reshape(saved_mean, oshape)
-  # compute saved_var
-  saved_var_mul1 = topi.multiply(running_var, topi.subtract(1, momentum))
-  saved_var_mul2 = topi.multiply(var, momentum)
-  saved_var = topi.add(saved_var_mul1, saved_var_mul2)
-  saved_var = topi.reshape(saved_var, oshape)
 
-  return [data, scale, bias, running_mean, running_var, momentum, eps, output, saved_mean, saved_var]
+  return [data, scale, bias, running_mean, running_var, momentum, eps, 
+            output, saved_mean, saved_rvars, running_mean_out, running_var_out]
 
 
 num_search_trails = 2
-N, C, H, W = 8, 3, 10, 10
+N, C, H, W = 10, 10, 10, 10
 
 time_begin = time.time()
 target = tvm.target.Target("cuda")

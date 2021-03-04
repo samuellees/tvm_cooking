@@ -15,8 +15,6 @@ num_test_trails = 100
 
 time_begin = time.time()
 N, C, H, W = 8, 3, 10, 10
-eps = 1e-5
-momentum = 0.1
 
 time_begin = time.time()
 target = tvm.target.Target("cuda")
@@ -36,7 +34,7 @@ sshape = (1, )
 data_torch = torch.rand(dshape, dtype=torch.float, requires_grad=True).cuda()
 data_torch.retain_grad()
 eps_torch = torch.rand(sshape, dtype=torch.float)
-batch_norm = torch.nn.BatchNorm2d(dshape[1], eps, momentum, affine=True, track_running_stats=True).cuda()
+batch_norm = torch.nn.BatchNorm2d(dshape[1], eps_torch.numpy()[0], affine=True, track_running_stats=True).cuda()
 # get internal tensor
 running_mean_torch = batch_norm.running_mean
 running_var_torch = batch_norm.running_var
@@ -49,15 +47,15 @@ scale_torch.data.normal_()
 bias_torch.data.normal_()
 # comput output
 out_torch = batch_norm(data_torch)
-grad_output_torch = torch.ones(dshape, dtype=torch.float).cuda()
+grad_output_torch = torch.rand(dshape, dtype=torch.float).cuda()
 out_torch.backward(grad_output_torch)
 # np arrays input
 data_np = data_torch.cpu().detach().numpy()
 scale_np = scale_torch.cpu().detach().numpy()
-saved_mean_np = running_mean_torch.cpu().detach().numpy()
-saved_var_np = running_var_torch.cpu().detach().numpy()
-grad_output_np = grad_output_torch.cpu().detach().numpy()
 eps_np = eps_torch.cpu().detach().numpy()
+saved_mean_np = data_np.mean((0, 2, 3))
+saved_var_np = np.sqrt(data_np.var((0, 2, 3)) + eps_np)
+grad_output_np = grad_output_torch.cpu().detach().numpy()
 # np arrays output
 grad_input_np = data_torch.grad.cpu().detach().numpy()
 grad_scale_np = scale_torch.grad.cpu().detach().numpy()
@@ -77,15 +75,17 @@ grad_scale_tvm = tvm.nd.empty(grad_scale_np.shape, ctx=ctx)
 grad_bias_tvm = tvm.nd.empty(grad_bias_np.shape, ctx=ctx)
 func(data_tvm, scale_tvm, saved_mean_tvm, saved_var_tvm, eps_tvm, grad_output_tvm, grad_input_tvm, grad_scale_tvm, grad_bias_tvm)
 # Check results
-np.testing.assert_allclose(data_np, data_tvm.asnumpy(), atol=1e-3)
-np.testing.assert_allclose(scale_np, scale_tvm.asnumpy(), atol=1e-3)
-np.testing.assert_allclose(saved_mean_np, saved_mean_tvm.asnumpy(), atol=1e-3)
-np.testing.assert_allclose(saved_var_np, saved_var_tvm.asnumpy(), atol=1e-3)
-np.testing.assert_allclose(grad_output_np, grad_output_tvm.asnumpy(), atol=1e-3)
+np.testing.assert_allclose(data_np, data_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+np.testing.assert_allclose(scale_np, scale_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+np.testing.assert_allclose(saved_mean_np, saved_mean_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+np.testing.assert_allclose(saved_var_np, saved_var_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+np.testing.assert_allclose(grad_output_np, grad_output_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
 
-np.testing.assert_allclose(grad_input_np, grad_input_tvm.asnumpy(), atol=1e-3)
-np.testing.assert_allclose(grad_scale_np, grad_scale_tvm.asnumpy(), atol=1e-3)
-np.testing.assert_allclose(grad_bias_np, grad_bias_tvm.asnumpy(), atol=1e-3)
+np.testing.assert_allclose(grad_input_np, grad_input_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+np.testing.assert_allclose(grad_scale_np, grad_scale_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+np.testing.assert_allclose(grad_bias_np, grad_bias_tvm.asnumpy(), atol=1e-3, rtol=1e-3)
+
+print(grad_scale_np, grad_scale_tvm.asnumpy())
 
 '''
 # torch timing

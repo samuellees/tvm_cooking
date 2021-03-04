@@ -14,7 +14,7 @@ target = tvm.target.Target(device)
 num_test_trails = 100
 
 time_begin = time.time()
-N, C, H, W = 8, 3, 10, 10
+N, C, H, W = 10, 10, 10, 10
 eps = 1e-5
 momentum = 0.1
 
@@ -68,23 +68,28 @@ momentum_tvm = tvm.nd.array(momentum_np, ctx=ctx)
 out_torch = batch_norm(data_torch)
 # np arrays output
 out_np = out_torch.cpu().detach().numpy()
-saved_mean_np = running_mean_torch.cpu().detach().numpy()
-saved_var_np = running_var_torch.cpu().detach().numpy()
+running_mean_np = running_mean_torch.cpu().detach().numpy()
+running_var_np = running_var_torch.cpu().detach().numpy()
 # tvm result
 out_tvm = tvm.nd.empty(out_torch.shape, ctx=ctx)
 saved_mean_tvm = tvm.nd.empty(running_mean_torch.shape, ctx=ctx)
-saved_var_tvm = tvm.nd.empty(running_var_torch.shape, ctx=ctx)
+saved_rvars_tvm = tvm.nd.empty(running_mean_torch.shape, ctx=ctx)
+running_mean_tvm2 = tvm.nd.empty(running_mean_np.shape, ctx=ctx)
+running_var_tvm2 = tvm.nd.empty(running_var_np.shape, ctx=ctx)
 func(data_tvm, scale_tvm, bias_tvm, running_mean_tvm, running_var_tvm, 
-    eps_tvm, momentum_tvm, out_tvm, saved_mean_tvm, saved_var_tvm)
+    momentum_tvm, eps_tvm, out_tvm, saved_mean_tvm, saved_rvars_tvm, running_mean_tvm2, running_var_tvm2)
 # Check results
-np.testing.assert_allclose(data_np, data_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(scale_np, scale_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(bias_np, bias_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(out_np, out_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(running_mean_np, running_mean_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(running_var_np, running_var_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(saved_mean_np, saved_mean_tvm.asnumpy(), rtol=1e-3)
-np.testing.assert_allclose(saved_var_np, saved_var_tvm.asnumpy(), rtol=1e-3)
+np.testing.assert_allclose(data_np, data_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(scale_np, scale_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(bias_np, bias_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(out_np, out_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(running_mean_np, running_mean_tvm2.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(running_var_np, running_var_tvm2.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(data_np.mean((0, 2, 3)), saved_mean_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+np.testing.assert_allclose(np.sqrt(data_np.var((0, 2, 3)) + eps_np), saved_rvars_tvm.asnumpy(), rtol=1e-3, atol=1e-3)
+
+# print(data_np.mean((0, 2, 3)))
+# print(saved_mean_tvm.asnumpy())
 
 '''
 # torch timing
