@@ -20,7 +20,8 @@ num_test_trails = 100
 num_search_trails = 1000
 
 time_begin = time.time()
-M, N, K = 8196, 8196, 8196
+# M, K, N = 4096, 4096, 4096
+M, K, N = 8000, 8000, 8000
 func_name = "gemm_m" + str(N) + "_n" + str(N) + "_k" + str(K) + "_" + str(device)
 log_file = func_name + ".json"
 

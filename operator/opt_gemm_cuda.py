@@ -6,16 +6,16 @@ dtype = "float32"
 target = 'cuda'
 np_repeat = 10
 
-matrix_size = 8192
+# matrix_size = 8192
 block_size = 64
 wptx = 4  # works per thread at x direction
 wpty = 8
 ntx = 16  # num of threads at x direction
 nty = 8
 
-M = matrix_size
-N = matrix_size
-K = matrix_size
+M = 8192
+K = 4096
+N = 8192
 
 # create tensor
 A = te.placeholder((M, K), name='A', dtype=dtype)

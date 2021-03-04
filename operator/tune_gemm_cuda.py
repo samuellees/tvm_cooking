@@ -103,11 +103,11 @@ def gemm_tune(M, N, K, dtype):
 dtype = "float32"
 target = 'cuda'
 
-matrix_size = 8096
-n_trail = 100
-M = matrix_size
-N = matrix_size
-K = matrix_size
+# matrix_size = 8192
+n_trail = 1000
+M = 8000
+K = 8000
+N = 8000
 log_file = './log/tune_gemm_cuda.log'
 
 # answer from numpy
@@ -125,7 +125,7 @@ logging.getLogger('autotvm').addHandler(logging.StreamHandler(sys.stdout))
 # measure options
 measure_option = autotvm.measure_option(builder='local', runner=autotvm.LocalRunner(number=5))
 # set random tunner
-tuner = autotvm.tuner.RandomTuner(task)
+tuner = autotvm.tuner.XGBTuner(task)
 tuner.tune(n_trial=n_trail,
            measure_option=measure_option,
            callbacks=[autotvm.callback.log_to_file(log_file)])
