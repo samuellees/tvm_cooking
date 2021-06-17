@@ -4,7 +4,7 @@ import numpy as np
 
 dtype = "float32"
 target = 'cuda'
-np_repeat = 10
+np_repeat = 100
 
 # matrix_size = 8192
 block_size = 64
@@ -13,9 +13,9 @@ wpty = 8
 ntx = 16  # num of threads at x direction
 nty = 8
 
-M = 8192
-K = 4096
-N = 8192
+M = 8000
+K = 8000
+N = 8000
 
 # create tensor
 A = te.placeholder((M, K), name='A', dtype=dtype)
@@ -110,9 +110,15 @@ flops = 2.0*M/1000*N/1000*K/1000/time
 print('tvm time: %f s' % time)
 print("flops: %f" % flops)
 
+# with cuda-10.1 tvm-0.7
 # flops of CUDA optimize: 6.378 T
 # flops of tvm optimize: 6.592 T
 
+
+# with cuda-11 tvm-0.8
+# flops of cublas optimize: 6.483 T
+# flops of CUDA optimize: 6.383 T
+# flops of tvm optimize: 6.332 T
 
 # print(tvm.lower(s, [A, B, C], simple_mode=True))
 

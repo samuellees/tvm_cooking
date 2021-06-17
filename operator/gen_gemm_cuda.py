@@ -34,29 +34,56 @@ log_file = func_name + ".json"
 task = tvm.auto_scheduler.create_task(gemm, (M, N, K, "float32"), target)
 
 ### search
-measure_ctx = auto_scheduler.LocalRPCMeasureContext(min_repeat_ms=300)
-tune_option = auto_scheduler.TuningOptions(
-    num_measure_trials=num_search_trails,
-    runner=measure_ctx.runner,
-    measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
-    verbose=2,
-)
-sch, args = auto_scheduler.auto_schedule(task, tuning_options=tune_option)
-del measure_ctx
+# measure_ctx = auto_scheduler.LocalRPCMeasureContext(min_repeat_ms=300)
+# tune_option = auto_scheduler.TuningOptions(
+#     num_measure_trials=num_search_trails,
+#     runner=measure_ctx.runner,
+#     measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
+#     verbose=2,
+# )
+# sch, args = auto_scheduler.auto_schedule(task, tuning_options=tune_option)
+# del measure_ctx
 
-### load history
+# ### load history
 # inp, res = auto_scheduler.load_best(log_file, task.workload_key)
 # sch, args = task.compute_dag.apply_steps_from_state(inp.state)
 
-# build func
-ctx = tvm.gpu()
-func = tvm.build(sch, args, target, name=func_name)
-# save result
-obj_fname = func_name + ".o"
-ptx_fname = func_name + ".ptx"
-func.save(obj_fname)
-func.imported_modules[0].save(ptx_fname)
+# # build func
+# ctx = tvm.gpu()
+# func = tvm.build(sch, args, target, name=func_name)
+# # save result
+# obj_fname = func_name + ".o"
+# ptx_fname = func_name + ".ptx"
+# func.save(obj_fname)
+# func.imported_modules[0].save(ptx_fname)
 
-time_end = time.time()
-print("IterTime: ", (time_end - time_begin))
-exit()
+# time_end = time.time()
+# print("IterTime: ", (time_end - time_begin))
+
+
+
+func_module = tvm.runtime.load_module(func_name + ".o")
+func_module_dev = tvm.runtime.load_module(func_name + ".ptx")
+func_module.import_module(func_module_dev)
+func = func_module.get_function(func_name)
+
+A = np.random.uniform(size=(M, K)).astype(np.float32)
+B = np.random.uniform(size=(K, N)).astype(np.float32)
+
+# tvm result
+ctx = tvm.gpu()
+A_tvm = tvm.nd.array(A, ctx=ctx) 
+B_tvm = tvm.nd.array(B, ctx=ctx)
+C_tvm = tvm.nd.empty((M, N), ctx=ctx)
+# func(A_tvm, B_tvm, C_tvm)
+
+# tvm timing.
+evaluator = func_module.time_evaluator(func_module.entry_name, ctx, repeat=num_test_trails, min_repeat_ms=500)
+evaluator(A_tvm, B_tvm, C_tvm)
+time = evaluator(A_tvm, B_tvm, C_tvm).mean
+flops = 2.0*M/1000*N/1000*K/1000/time
+print('tvm time: %f s' % time)
+print("flops: %f" % flops)
+
+# with cuda-11 tvm-0.8
+# 6.614 Flops
